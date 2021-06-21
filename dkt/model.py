@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F 
 import numpy as np
-import copy
 import re
 import math
 
@@ -424,7 +422,7 @@ class Bert(nn.Module):
         # out = self.fc(out)
         # preds = self.activation(out).view(batch_size, -1)
 
-        # reg_layer
+        # + reg_layer
         out = self.reg_layer(out)
         out = self.fc(out)
         preds = self.activation(out).view(batch_size, -1)
@@ -696,11 +694,6 @@ class TfixupBert(nn.Module):
 
         # 특정 layer들의 값을 스케일링한다
         for name, param in self.named_parameters():
-
-            # TODO: 모델 내부의 module 이름이 달라지면 직접 수정해서
-            #       module이 scaling 될 수 있도록 변경해주자
-            # print(name)
-
             if re.match(r'^embedding*', name):
                 temp_state_dict[name] = (9 * self.args.n_layers) ** (-1 / 4) * param   
             elif re.match(r'.*Norm.*', name):

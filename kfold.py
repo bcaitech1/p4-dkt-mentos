@@ -24,22 +24,11 @@ def main(args):
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
     train_data = preprocess.get_train_data()
-    # train_data, valid_data = preprocess.split_data(train_data, seed=42)
 
     get_train_oof(args, train_data)
 
-    # preprocess.load_test_data(args.test_file_name)
-    # test_data = preprocess.get_test_data()
 
-    # trainer.multi_inference(args, test_data)
-
-
-def get_train_oof(args, data, fold_n=5, stratify=True):
-
-        oof = np.zeros(data.shape[0])
-
-        fold_models = []
-
+def get_train_oof(args, data, fold_n=10, stratify=True):
         if stratify:
             kfold = StratifiedKFold(n_splits=fold_n)
         else:

@@ -21,4 +21,4 @@ if __name__ == "__main__":
     os.makedirs(args.model_dir, exist_ok=True)
     main(args)
 
-    ## model_name을 지정해줘야 한다. default: model.pt
+    ## python3 inference_multi.py --model_name bert_k7_final.pt
