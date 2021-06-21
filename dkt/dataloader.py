@@ -7,13 +7,12 @@ import pickle
 import pandas as pd
 import numpy as np
 
+import torch
+
 from datetime import datetime
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn import preprocessing
-
-from torch.nn.utils.rnn import pad_sequence
-import torch
 
 # feature 추가 #1~2 수정
 
@@ -41,7 +40,7 @@ class Preprocess:
         split data into two parts with a given ratio.
         """
         if shuffle:
-            random.seed(seed) # fix to default seed 42
+            random.seed(seed)
             random.shuffle(data)
 
         size = int(len(data) * ratio)
@@ -67,9 +66,6 @@ class Preprocess:
 
         #1-2 continuous feature
 
-        def percentile(s):
-            return np.sum(s) / len(s)
-
         ## time to sec
         def convert_time(s):
             timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
@@ -91,49 +87,21 @@ class Preprocess:
         # boundary
         df['boundary'] = [u % t if t != 0 else 0.0 for t, u in zip(df['TestSize'], df['UserTestCumtestnum'])] 
 
+        # 처음 푼 문제만 사용
         df = copy.deepcopy(df[df['Retest'] == 0])
 
         ## time diff
         time_diff = df.groupby(['userID', 'head', 'mid'])['Timestamp'].diff()
         df['time_diff'] = time_diff
         df.loc[df['boundary'] == 0, 'time_diff'] = np.NaN
+
+        # 2번째 문제를 기준으로 1번째 문제를 채운다
         df['time_diff'].fillna(method='bfill', inplace=True)
         # df['time_diff'].fillna(0, inplace=True) -> 성능하락
 
         df['time_diff'] = df['time_diff'].map(lambda x: 600 if x>600 else x)
-
-        # def cate_diff(x):
-        #     if x > 600:
-        #         return "A"
-        #     if 500 < x <= 600:
-        #         return "B"
-        #     if 400 < x <= 500:
-        #         return "C"
-        #     if 300 < x <= 400:
-        #         return "D"
-        #     if 200 < x <= 300:
-        #         return "E"
-        #     if 100 < x <= 200:
-        #         return "F"
-        #     if 50 < x <= 100:
-        #         return "G"
-        #     if x <= 50:
-        #         return "H"
-
-        # load
-        # with open('/opt/ml/code/dkt/max_bins_set.pkl', 'rb') as f:
-        #     ser, bins = pickle.load(f)
-
-        # df['time_diff'] = df['time_diff'].map(lambda x: cate_diff(x))
-        # df['time_diff'] = pd.qcut(df['time_diff'], q=23).cat.rename_categories(list(range(23))).astype(str)
-        # df['time_diff'] = pd.qcut(df['time_diff'], q=20).cat.rename_categories(list('abcdefghijklnmopqrst')).astype(str)
-        # df['time_diff'] = pd.qcut(df['time_diff'], q=20).astype(str)
-
-        # df['time_diff'] = pd.cut(df['time_diff'], bins=bins, labels=False, include_lowest=True)
+        df['time_diff'] = pd.cut(df['time_diff'], bins=600).astype(str) 
         
-        thr = 600
-        df['time_diff'] = pd.cut(df['time_diff'], bins=thr).astype(str) #.cat.rename_categories(list(range(thr)))
-        # df['time_diff'] = pd.cut(df['time_diff'], bins=600).astype(str)
 
         # head별 정답률
         answer_head_mean = df.groupby(['userID', 'head'])['answerCode'].mean()
@@ -172,8 +140,6 @@ class Preprocess:
             ])
 
         self.args.cont_cols.extend([
-            # 'time_diff',
-            # 'time_median',
             'head_answerProb',
             'mid_answerProb',
             'tail_answerProb',
@@ -217,9 +183,6 @@ class Preprocess:
         # standard scaler
         std_scaler = preprocessing.StandardScaler().fit(df[cont_cols] )
         df[cont_cols] = std_scaler.transform(df[cont_cols])
-        
-
-        # df.to_csv('peprocess_test.csv')
 
         return df
 
@@ -320,21 +283,17 @@ class DKTDataset(torch.utils.data.Dataset):
         return len(self.data)
 
 
-from torch.nn.utils.rnn import pad_sequence
-
 def collate(batch):
     col_n = len(batch[0])
     col_list = [[] for _ in range(col_n)]
     max_seq_len = len(batch[0][-1])
 
-        
     # batch의 값들을 각 column끼리 그룹화
     for row in batch:
         for i, col in enumerate(row):
             pre_padded = torch.zeros(max_seq_len)
             pre_padded[-len(col):] = col
             col_list[i].append(pre_padded)
-
 
     for i, _ in enumerate(col_list):
         col_list[i] =torch.stack(col_list[i])
